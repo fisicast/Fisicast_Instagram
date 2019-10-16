@@ -1,0 +1,234 @@
+##########################################
+##					##
+##	AVISO!! Esse código vai gerar 	##
+## 	3*ntot^2+90 imagens na pasta que  ##
+##		ele rodar!!		##
+##					##
+##########################################
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+import math
+
+# numero total de pontos vai ser ntot^2
+ntot=10;
+#ponto solucao
+cent=[0.62+0.05,0.62+0.07];
+
+###########################################
+##					###
+##   Cria figuras para o método de rede	###
+##					###
+###########################################
+
+
+counter=0;
+
+xarray=[];
+yarray=[];
+
+print("comecando o metodo de rede...")
+
+#calculando a distancia ao ponto que é a solucao e gerando as imagens
+for i1 in range(1,ntot+1):
+	for i2 in range(1,ntot+1):
+
+		counter=counter+1;
+
+		for i in range(0,i1):
+			for j in range(0,i2):
+				xarray.append(0.05+(1.0-0.05)*i/ntot);
+				yarray.append(0.05+(1.0-0.05)*j/ntot);
+		f = plt.figure();
+
+		ax = f.add_subplot(1,1,1);
+
+		ax.scatter(xarray,yarray, c='red',s=10);
+		ax.scatter([cent[0]],[cent[1]], c='black',s=20);
+
+		ax.set_aspect(aspect=1)
+
+		plt.xlabel(r'$var_1$')
+		plt.ylabel(r'$var_2$');
+
+		plt.axis([0,1,0,1]);
+		f.tight_layout();
+		f.savefig("./grid_video"+str(counter)+".png");
+		plt.close(f)
+
+# aqui acha o ponto mais próximo da solucao
+ifin=np.argmin([np.sqrt((cent[0]-xarray[i])*(cent[0]-xarray[i])+(cent[1]-yarray[i])*(cent[1]-yarray[i])) for i in range(len(xarray))]);
+
+# Aqui gera as ultimas imagens que realçam o ponto mais próximo com um circulo
+for i in range(0,30):
+	counter=counter+1;
+
+	f= plt.figure();
+
+	ax = f.add_subplot(1,1,1);
+
+	plt.scatter(xarray,yarray, c='red',s=10);
+	plt.scatter([cent[0]],[cent[1]], c='black',s=20);
+	circle1=plt.Circle((xarray[ifin], yarray[ifin]), 0.02, color='blue',fill=False)
+
+	ax.add_artist(circle1)
+	ax.set_aspect(aspect=1)
+
+	plt.xlabel(r'$var_1$')
+	plt.ylabel(r'$var_2$');
+	plt.axis([0,1,0,1]);
+	f.tight_layout();
+	f.savefig("./grid_video"+str(counter)+".png");
+	plt.close(f)
+
+print("terminado")
+###################################################
+##						###
+##   Cria figuras para o método Monte Carlo	###
+##		ou aleatório			###
+##						###
+###################################################
+
+print("comecando o metodo Monte Carlo...")
+
+counter=0;
+
+
+# gerando as solucoes aleatórias
+randX=np.random.uniform(0.0,1,ntot*ntot);
+randY=np.random.uniform(0.0,1,ntot*ntot);
+
+xarray=[];
+yarray=[];
+
+#calculando a distancia ao ponto que é a solucao
+for i in range(0,len(randX)):
+	counter=counter+1;
+	xarray.append(randX[i]);
+	yarray.append(randY[i]);
+
+	f= plt.figure();
+
+	ax = f.add_subplot(1,1,1);
+	ax.scatter(xarray,yarray, c='red',s=10);
+	ax.scatter([cent[0]],[cent[1]], c='black',s=20);
+
+	ax.set_aspect(aspect=1)
+
+	plt.xlabel(r'$var_1$')
+	plt.ylabel(r'$var_2$');
+	plt.axis([0,1,0,1]);
+	f.tight_layout();
+	f.savefig("./random_video"+str(counter)+".png");
+	plt.close(f)
+
+
+# aqui acha o ponto mais próximo da solucao
+ifin=np.argmin([np.sqrt((cent[0]-xarray[i])*(cent[0]-xarray[i])+(cent[1]-yarray[i])*(cent[1]-yarray[i])) for i in range(len(xarray))]);
+
+
+# Aqui gera as ultimas imagens que realçam o ponto mais próximo com um circulo
+for i in range(0,30):
+	counter=counter+1;
+
+	f= plt.figure();
+
+	ax = f.add_subplot(1,1,1);
+
+	plt.scatter(xarray,yarray, c='red',s=10);
+	plt.scatter([cent[0]],[cent[1]], c='black',s=20);
+	circle1=plt.Circle((xarray[ifin], yarray[ifin]), 0.02, color='blue',fill=False)
+
+	ax.add_artist(circle1)
+	ax.set_aspect(aspect=1)
+
+	plt.xlabel(r'$var_1$')
+	plt.ylabel(r'$var_2$');
+	plt.axis([0,1,0,1]);
+	f.tight_layout();
+	f.savefig("./random_video"+str(counter)+".png");
+	plt.close(f)
+
+print("terminado")
+###########################################################
+##							###
+##   Cria figuras para o método Monte Carlo Adaptativo	###
+##							###
+###########################################################
+
+counter=0;
+
+print("comecando o metodo Monte Carlo Adaptativo...")
+
+randX=np.random.normal(0.0,0.1,ntot*ntot);
+xarray=[];
+yarray=[];
+
+#condicoes iniciais para o problem. Se eu colocar muito perto ele vai convergir muito rápido e se colocar muito longe ele nao vai convergir.
+init=[0.04,0.1];
+ifin=0;
+
+
+dist0=(np.sqrt((cent[0]-init[0])*(cent[0]-init[0])+(cent[1]-init[1])*(cent[1]-init[1])));
+
+for i in range(0,len(randX)):
+	counter=counter+1;
+
+	# gero numeros aleatório ao redor do ponto que estou atual (init). sigma regula a probabilidade de estar muito longe desse ponto. 
+	#Se sigma for muito pequeno ou muito grande, pode demorar para convergir.
+	sigma=0.025;
+	xaux=np.random.normal(init[0],sigma);
+	yaux=np.random.normal(init[1],sigma);
+	xarray.append(xaux);
+	yarray.append(yaux);
+
+	f= plt.figure();
+
+	ax = f.add_subplot(1,1,1);
+	ax.scatter(xarray,yarray, c='red',s=10);
+	ax.scatter([cent[0]],[cent[1]], c='black',s=20);
+
+
+	dist1=np.sqrt((cent[0]-xaux)*(cent[0]-xaux)+(cent[1]-yaux)*(cent[1]-yaux));
+
+	# o pulo do gato está aqui. Quando acho uma solucao melhor, mudo o ponto que gera os números aleatórios para essa soluao
+	if dist1<=dist0:
+		dist0 = dist1;
+		init = [xaux,yaux];
+		
+
+	ax.set_aspect(aspect=1)
+	plt.xlabel(r'$var_1$')
+	plt.ylabel(r'$var_2$');
+	plt.axis([0,1,0,1]);
+	f.tight_layout();
+	f.savefig("./adaptative_video"+str(counter)+".png");
+	plt.close(f)
+
+# aqui acha o ponto mais próximo da solucao
+ifin=np.argmin([np.sqrt((cent[0]-xarray[i])*(cent[0]-xarray[i])+(cent[1]-yarray[i])*(cent[1]-yarray[i])) for i in range(len(xarray))]);
+
+# Aqui gera as ultimas imagens que realçam o ponto mais próximo com um circulo
+for i in range(0,30):
+	counter=counter+1;
+
+	f= plt.figure();
+
+	ax = f.add_subplot(1,1,1);
+
+	plt.scatter(xarray,yarray, c='red',s=10);
+	plt.scatter([cent[0]],[cent[1]], c='black',s=20);
+	circle1=plt.Circle((xarray[ifin], yarray[ifin]), 0.02, color='blue',fill=False)
+
+	ax.add_artist(circle1)
+	ax.set_aspect(aspect=1)
+
+	plt.xlabel(r'$var_1$')
+	plt.ylabel(r'$var_2$');
+	plt.axis([0,1,0,1]);
+	f.tight_layout();
+	f.savefig("./adaptative_video"+str(counter)+".png");
+	plt.close(f)
+
+print("terminado")
