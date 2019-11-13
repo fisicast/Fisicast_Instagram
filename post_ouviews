@@ -3,7 +3,7 @@ import numpy as np
 import csv
 import datetime
 from scipy.optimize import curve_fit
-
+from scipy.optimize import fsolve
 
 # aqui é uma variável para ajudar a obter os dados em um formato apropriado do arquivo CSV do Anchor
 dados_aux=[]
@@ -32,25 +32,78 @@ for i in range(len(dados_aux)):
 	dados[1].append(ntot*1e-3)
 
 
-
 ## parametros que usarei para plotar as curvas
 x_new = np.linspace(0.0, 400, 100)
 
 
 # fitando uma reta
 z = np.polyfit(dados[0], dados[1], 1)
-f = np.poly1d(z)
+f1 = np.poly1d(z)
 
-y_linear_fit = f(x_new)
+y_linear_fit = f1(x_new)
 
-## fitando uma exponencial
+# fitando uma quadratica
+z = np.polyfit(dados[0], dados[1], 2)
+f2 = np.poly1d(z)
+
+y_quadratica_fit = f2(x_new)
+
+
+## fitando uma cubica
 def fit_func(x, a, b, c):
-    return c+b*np.exp(a*x)
+    return a*(x**3)+b*(x**2) + c*x #c+b*np.exp(a*x)
 
 params = curve_fit(fit_func, dados[0], dados[1], p0=[0.00001,0.5,-0.5])
+
+# parâmetros
 [a, b, c] = params[0]
 
+# erros nos parâmetros
+perr = np.sqrt(np.diag(params[1]))
 y_exponencial_fit = fit_func(x_new,a,b, c)
+
+
+y_cubica_fit =  fit_func(x_new,a,b,c)
+
+
+# Apenas uma funcao para ajudar a implementar o fsolve que resolve f(x)=0
+def solve_func(x):
+	return fit_func(x,a,b,c)-100
+
+## acha a solucao para quando Nouviews = 100k
+solution = fsolve(solve_func,300)
+
+
+# curva erro-
+def solve_func(x):
+	return fit_func(x,a+perr[0],b+perr[1],c+perr[2])-100
+
+solution_min = fsolve(solve_func,300)
+
+# curva erro+
+def solve_func(x):
+	return fit_func(x,a-perr[0],b-perr[1],c-perr[2])-100
+
+solution_max = fsolve(solve_func,300)
+
+
+
+## poe na tela!!
+print('Tempo total para chegar em 100k (em dias):')
+print('{} +{} ou -{}'.format(int(solution),int(solution_max-solution),int(solution-solution_min)))
+print('Previsao de Chegar em 100k:')
+print('De {}  a {} onde melhor previsao: {}'.format(
+(dados_aux[0][0]+datetime.timedelta(days=-7)+datetime.timedelta(days=int(solution_min))),
+(dados_aux[0][0]+datetime.timedelta(days=-7)+datetime.timedelta(days=int(solution_max))),
+(dados_aux[0][0]+datetime.timedelta(days=-7)+datetime.timedelta(days=int(solution)))
+))
+
+
+####################################
+#
+#   Figura dos Fits
+#
+####################################
 
 
 # eu gosto de criar o plot eixos...
@@ -61,24 +114,150 @@ ax.append(plt.subplot(1,1,1))
 
 
 # plot dos dados
-ax[0].scatter(dados[0],dados[1],label='Dados Oficiais')
+ax[0].scatter(dados[0],dados[1],c='black', label='Dados Oficiais')
 
 #plot do fit linear
 ax[0].plot(x_new,y_linear_fit,color='red', label='Ajuste por Reta')
 
-#plot do fit exponencial
-ax[0].plot(x_new,y_exponencial_fit,color='blue', label='Ajuste por Exponencial')
+#plot do fit quadratico
+#ax[0].plot(x_new,y_quadratica_fit,color='green', label='Ajuste por quadrática')
 
-## coisas para deixar o gráfico bonito
+#plot do fit cubico
+ax[0].plot(x_new,y_cubica_fit,color='blue', label='Ajuste por Cúbica')
+
+### coisas para deixar o gráfico bonito
 
 ax[0].grid(linestyle='--', linewidth=0.3)
 ax[0].set_title("Evolucao dos Ouviews do Fisicast", fontsize=22)
 ax[0].legend(fontsize=18)
 ax[0].set_xlabel(r'Dias que o Podcast ficou no ar', fontsize=22)
 ax[0].set_ylabel(r'Numero de Ouviews (em milhares)', fontsize=22);
-ax[0].set_xlim([0,365]);
+ax[0].set_xlim([0,359]);
 ax[0].set_ylim([0.0,110]);
 ax[0].tick_params(labelsize=22)
 plt.tight_layout();
-plt.savefig("./post_fisicast_dados.pdf");
+plt.savefig("./post_fisicast_previsao.png");
 plt.close(fig)
+
+
+
+####################################
+#
+#   Figura Erro nos Fits
+#
+####################################
+
+
+
+# eu gosto de criar o plot eixos...
+fig=plt.figure(figsize=(10,10));
+ax=[]
+
+ax.append(plt.subplot(1,1,1))
+
+
+
+
+## valor central
+y_cubica_fit0 =  fit_func(x_new,a,b,c)
+
+
+#valor maximo
+y_cubica_fit1 =  fit_func(x_new,a-perr[0],b-perr[1],c-perr[2])
+
+
+# valor mínimo
+y_cubica_fit2 =  fit_func(x_new,a+perr[0],b+perr[1],c+perr[2])
+
+
+# plot dos dados
+ax[0].scatter(dados[0],dados[1],c='black', label='Dados Oficiais')
+
+
+x = np.arange(0.0, 2, 0.01)
+y1 = np.sin(2 * np.pi * x)
+y2 = 1.2 * np.sin(4 * np.pi * x)
+
+## erros
+ax[0].fill_between(x_new, y_cubica_fit1, y_cubica_fit2, color='cyan', alpha=0.5, label='68% C.L.')
+
+#plot do fit cubico
+ax[0].plot(x_new,y_cubica_fit0,color='blue', label='Ajuste por Cúbica')
+
+
+
+ax[0].plot([solution_max,solution_max],[0,100],color='red')
+ax[0].plot([solution_min,solution_min],[0,100],color='red')
+ax[0].text(0.96*solution_max,50,'{} dias'.format(int(solution_max[0])), rotation=90,color='red', alpha=1, fontsize=18)
+ax[0].text(0.96*solution_min,50,'{} dias'.format(int(solution_min[0])), rotation=90,color='red', alpha=1, fontsize=18)
+
+### coisas para deixar o gráfico bonito
+
+ax[0].grid(linestyle='--', linewidth=0.3)
+ax[0].set_title("Evolucao dos Ouviews do Fisicast", fontsize=22)
+ax[0].legend(fontsize=18)
+ax[0].set_xlabel(r'Dias que o Podcast ficou no ar', fontsize=22)
+ax[0].set_ylabel(r'Numero de Ouviews (em milhares)', fontsize=22);
+ax[0].set_xlim([0,380]);
+ax[0].set_ylim([0.0,110]);
+ax[0].tick_params(labelsize=22)
+plt.tight_layout();
+plt.savefig("./post_fisicast_erros.png");
+plt.close(fig)
+
+
+
+
+## fitando uma exponencial
+def fit_func2(x, a, b, c):
+    return c+b*np.exp(a*x)
+
+params = curve_fit(fit_func2, dados[0], dados[1], p0=[0.00001,0.5,-0.5])
+[a, b, c] = params[0]
+y_exponencial_fit = fit_func2(x_new,a,b, c)
+
+
+
+
+####################################
+#
+#   Figura decidir Fits
+#
+####################################
+
+
+# eu gosto de criar o plot eixos...
+fig=plt.figure(figsize=(10,10));
+ax=[]
+
+ax.append(plt.subplot(1,1,1))
+
+
+# plot dos dados
+ax[0].scatter(dados[0],dados[1],c='black', label='Dados Oficiais')
+
+#plot do fit exponencial
+ax[0].plot(x_new,y_exponencial_fit,color='red', label='Ajuste por Exponencial (?)')
+
+#plot do fit cubico
+ax[0].plot(x_new,y_cubica_fit,color='blue', label='Ajuste por Cúbica (?)')
+
+### coisas para deixar o gráfico bonito
+
+ax[0].grid(linestyle='--', linewidth=0.3)
+ax[0].set_title("Evolucao dos Ouviews do Fisicast", fontsize=22)
+ax[0].legend(fontsize=18)
+ax[0].set_xlabel(r'Dias que o Podcast ficou no ar', fontsize=22)
+ax[0].set_ylabel(r'Numero de Ouviews (em milhares)', fontsize=22);
+ax[0].set_xlim([0,359]);
+ax[0].set_ylim([0.0,110]);
+ax[0].tick_params(labelsize=22)
+plt.tight_layout();
+plt.savefig("./post_fisicast_compara_fit.png");
+plt.close(fig)
+
+
+
+
+
+
