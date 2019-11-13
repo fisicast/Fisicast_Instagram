@@ -1,0 +1,84 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import csv
+import datetime
+from scipy.optimize import curve_fit
+
+
+# aqui é uma variável para ajudar a obter os dados em um formato apropriado do arquivo CSV do Anchor
+dados_aux=[]
+
+with open('Fisicast_TotalPlays_2018-12-26_to_2019-11-06.csv', mode='r') as csv_file:
+	csv_reader = csv.DictReader(csv_file)
+	reader = csv.reader(csv_file)
+	row1 = next(reader) 
+	# loop para ler todas as linhas
+	for row in reader:
+		date_time_obj = datetime.datetime.strptime(row[0], '%m/%d/%Y %H:%M:%S')
+		dados_aux.append([date_time_obj.date() ,int(row[1])])
+
+
+
+# convertemos os dados para o número de dias passados.
+
+## aqui vai ser a tabela final com os dados
+dados=[[],[]]
+
+## escrevendo os dados de forma mais adequada. O fator +7 significa que o ponto inicial do anchor só aparece depois dos primeiros 7 dias.
+ntot=0
+for i in range(len(dados_aux)):
+	ntot=ntot+dados_aux[i][1]
+	dados[0].append((dados_aux[i][0]-dados_aux[0][0]).days+7)
+	dados[1].append(ntot*1e-3)
+
+
+
+## parametros que usarei para plotar as curvas
+x_new = np.linspace(0.0, 400, 100)
+
+
+# fitando uma reta
+z = np.polyfit(dados[0], dados[1], 1)
+f = np.poly1d(z)
+
+y_linear_fit = f(x_new)
+
+## fitando uma exponencial
+def fit_func(x, a, b, c):
+    return c+b*np.exp(a*x)
+
+params = curve_fit(fit_func, dados[0], dados[1], p0=[0.00001,0.5,-0.5])
+[a, b, c] = params[0]
+
+y_exponencial_fit = fit_func(x_new,a,b, c)
+
+
+# eu gosto de criar o plot eixos...
+fig=plt.figure(figsize=(10,10));
+ax=[]
+
+ax.append(plt.subplot(1,1,1))
+
+
+# plot dos dados
+ax[0].scatter(dados[0],dados[1],label='Dados Oficiais')
+
+#plot do fit linear
+ax[0].plot(x_new,y_linear_fit,color='red', label='Ajuste por Reta')
+
+#plot do fit exponencial
+ax[0].plot(x_new,y_exponencial_fit,color='blue', label='Ajuste por Exponencial')
+
+## coisas para deixar o gráfico bonito
+
+ax[0].grid(linestyle='--', linewidth=0.3)
+ax[0].set_title("Evolucao dos Ouviews do Fisicast", fontsize=22)
+ax[0].legend(fontsize=18)
+ax[0].set_xlabel(r'Dias que o Podcast ficou no ar', fontsize=22)
+ax[0].set_ylabel(r'Numero de Ouviews (em milhares)', fontsize=22);
+ax[0].set_xlim([0,365]);
+ax[0].set_ylim([0.0,110]);
+ax[0].tick_params(labelsize=22)
+plt.tight_layout();
+plt.savefig("./post_fisicast_dados.pdf");
+plt.close(fig)
