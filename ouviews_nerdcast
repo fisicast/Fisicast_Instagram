@@ -1,0 +1,183 @@
+############################
+## Criado por Pedro Pasquini
+##        26/11/2019
+############################
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+import csv
+import datetime
+from scipy.optimize import curve_fit
+from scipy.optimize import fsolve
+
+##################
+#
+#  ticks log plot
+#
+#################
+
+auxtick=[];
+auxlable=[];
+for i in range(0,9):
+	for j in range (1,10):
+		auxtick.append(np.log10(j*(10**i)));
+		if j==1 and i==0:
+			auxlable.append(r'$1$');
+		elif j==1 and i==1:
+			auxlable.append(r'$10$');
+		elif j==1:
+			auxlable.append(r'$10^{{{}}}$'.format(i));
+		else:
+			auxlable.append(''.format(i));
+
+## parametros que usarei para plotar as curvas
+x_new = np.linspace(1.0, 4961, 100)
+
+
+## Estou colocando apenas 2 parâmetros porque a cubica que descreve ouvius é da forma: ax^3+bx
+def cubica(x,a,b):
+	# estou plotando o log por ser uma variacao muito grande no numero de ouviews
+	return np.log10(a*x*x*x+b*x)
+
+
+## Para achar a solucao usei os parâmetros cubica(14,a,b) = 250 e cubica(4961,a,b) = 1e9
+y_plot = cubica(x_new,0.0081895,16.252)
+
+####################################
+#
+#   Figura dos ouviews
+#
+####################################
+
+
+# eu gosto de criar o plot eixos...
+fig=plt.figure(figsize=(10,10));
+ax=[]
+
+ax.append(plt.subplot(1,1,1))
+
+#plot do fit linear
+ax[0].plot(x_new,y_plot,color='black', label='Número total de ouviews')
+
+### coisas para deixar o gráfico bonito
+
+ax[0].grid(linestyle='--', linewidth=0.3)
+ax[0].set_title("Evolucao dos Ouviews do Nerdcast", fontsize=22)
+ax[0].legend(fontsize=18)
+ax[0].set_xlabel(r'Dias que o Podcast ficou no ar', fontsize=22)
+ax[0].set_ylabel(r'Numero de Ouviews', fontsize=22);
+ax[0].set_yticks(auxtick)
+ax[0].set_yticklabels(auxlable)
+
+ax[0].set_xlim([0,4961]);
+ax[0].set_ylim([np.log10(1.0),np.log10(1e9)]);
+ax[0].tick_params(labelsize=22)
+plt.tight_layout();
+plt.savefig("./NERDCAST_ouviews.png");
+plt.close(fig)
+
+
+Ndias_final = 4961
+
+nstep = int(Ndias_final/30)
+aux_ntot_Ini = 0
+aux_dinheiro_col = 0
+aux_dinheiro_poup = 0
+aux_dinheiro_tes = 0
+ndias = 0
+rendimento = 0.579/100.0 # por 30 dias
+
+## rendimento médio tesouro de 2007 até 2016 segundo: (rendimento de 417% em 10 anos)
+## https://www.infomoney.com.br/onde-investir/tesouro-direto-foi-o-melhor-investimento-dos-ultimos-10-anos/
+rendimento1 = 1.379/100.0 # por 30 dias
+
+y_rendimento_colchao = []
+y_rendimento_poupanca = []
+y_rendimento_tesouro = []
+
+x_dias = []
+for i in range(nstep):
+	ndias = ndias + 30
+	x_dias.append(np.log10(ndias))
+
+	aux_ntot_Fin = 10**(cubica(ndias,0.0081895,16.252))
+
+	## poupanca: 
+	aux_dinheiro_col = aux_dinheiro_col + (aux_ntot_Fin-aux_ntot_Ini)
+	y_rendimento_colchao.append(np.log10(aux_dinheiro_col))
+
+	## poupanca: 
+	aux_dinheiro_poup = (1+rendimento)*aux_dinheiro_poup + (aux_ntot_Fin-aux_ntot_Ini)
+	y_rendimento_poupanca.append(np.log10(aux_dinheiro_poup))
+
+	## tesouro: 
+	aux_dinheiro_tes = (1+rendimento1)*aux_dinheiro_tes + (aux_ntot_Fin-aux_ntot_Ini)
+	y_rendimento_tesouro.append(np.log10(aux_dinheiro_tes))
+
+
+	aux_ntot_Ini = aux_ntot_Fin
+
+
+#aqui é para adicionar o resto do dinheiro, caso Ndias_final nao seja divisível pro 30.
+x_dias.append(np.log10(Ndias_final))
+
+ntot = len(x_dias)-1
+
+aux_dinheiro_col=aux_dinheiro_col+(10**(cubica(Ndias_final,0.0081895,16.252))-aux_ntot_Ini)
+y_rendimento_colchao.append(np.log10(aux_dinheiro_col))
+
+aux_dinheiro_poup=aux_dinheiro_poup+(10**(cubica(Ndias_final,0.0081895,16.252))-aux_ntot_Ini)
+y_rendimento_poupanca.append(np.log10(aux_dinheiro_poup))
+
+aux_dinheiro_tes=aux_dinheiro_tes+(10**(cubica(Ndias_final,0.0081895,16.252))-aux_ntot_Ini)
+y_rendimento_tesouro.append(np.log10(aux_dinheiro_tes))
+
+print('rendimentos:\n colchao: {:.8} \n poupanca: {:.8} \n tesouro direto: {:.8}'.format(10**y_rendimento_colchao[ntot],10**y_rendimento_poupanca[ntot],10**y_rendimento_tesouro[ntot]))
+
+####################################
+#
+#   Figura dos rendimentos
+#
+####################################
+
+
+# eu gosto de criar o plot eixos...
+fig=plt.figure(figsize=(10,10));
+ax=[]
+
+ax.append(plt.subplot(1,1,1))
+
+#plot do fit linear
+ax[0].plot(x_dias,y_rendimento_colchao,color='red', label='Rendimento Colchao do Sr. K')
+ax[0].plot(x_dias,y_rendimento_poupanca,color='black', label='Rendimento Poupanca')
+ax[0].plot(x_dias,y_rendimento_tesouro,color='blue', label='Rendimento Tesouro')
+
+
+### coisas para deixar o gráfico bonito
+
+ax[0].grid(linestyle='--', linewidth=0.3)
+ax[0].set_title("Evolucao do dinheiro que o Azagal Perdeu", fontsize=22)
+ax[0].legend(fontsize=18)
+ax[0].set_xlabel(r'Dias que o Podcast ficou no ar', fontsize=22)
+ax[0].set_ylabel(r'Dinheiros (Em Reais)', fontsize=22);
+
+
+ax[0].set_xticks(auxtick)
+ax[0].set_xticklabels(auxlable)
+
+ax[0].set_yticks(auxtick)
+ax[0].set_yticklabels(auxlable)
+
+ax[0].set_xlim([np.log10(30.0),np.log10(Ndias_final)]);
+ax[0].set_ylim([np.log10(250.0),np.log10(2e9)]);
+ax[0].tick_params(labelsize=22)
+plt.tight_layout();
+plt.savefig("./NERDCAST_dinheiro.png");
+plt.close(fig)
+
+
+
+
+
+
