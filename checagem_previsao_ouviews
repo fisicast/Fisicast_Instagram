@@ -1,0 +1,248 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import csv
+import datetime
+from scipy.optimize import curve_fit
+from scipy.optimize import fsolve
+
+# aqui é uma variável para ajudar a obter os dados em um formato apropriado do arquivo CSV do Anchor
+dados_aux=[]
+dados_aux2=[]
+
+## Por algum motivo, o arquivo que vai até 06/11 tem datos só até 31/10...
+with open('Fisicast_TotalPlays_2018-12-26_to_2019-11-06.csv', mode='r') as csv_file:
+	csv_reader = csv.DictReader(csv_file)
+	reader = csv.reader(csv_file)
+	row1 = next(reader) 
+	# loop para ler todas as linhas
+	for row in reader:
+		date_time_obj = datetime.datetime.strptime(row[0], '%m/%d/%Y %H:%M:%S')
+		dados_aux.append([date_time_obj.date() ,int(row[1])])
+
+
+## Por algum motivo, o arquivo que vai até 16/01 tem datos só até 09/01...
+with open('Fisicast_TotalPlays_2018-12-27_to_2020-01-16.csv', mode='r') as csv_file:
+	csv_reader = csv.DictReader(csv_file)
+	reader = csv.reader(csv_file)
+	row1 = next(reader) 
+	# loop para ler todas as linhas
+	for row in reader:
+		date_time_obj = datetime.datetime.strptime(row[0], '%m/%d/%Y %H:%M:%S')
+		dados_aux2.append([date_time_obj.date() ,int(row[1])])
+
+
+# convertemos os dados para o número de dias passados.
+
+## aqui vai ser a tabela final com os dados
+dados=[[],[]]
+dados2=[[],[]]
+
+## escrevendo os dados de forma mais adequada. O fator +7 significa que o ponto inicial do anchor só aparece depois dos primeiros 7 dias.
+ntot=0
+for i in range(len(dados_aux)):
+	ntot=ntot+dados_aux[i][1]
+	dados[0].append((dados_aux[i][0]-dados_aux[0][0]).days+7)
+	dados[1].append(ntot*1e-3)
+
+ntot2=0
+for i in range(len(dados_aux2)):
+	ntot2=ntot2+dados_aux2[i][1]
+	dados2[0].append((dados_aux2[i][0]-dados_aux2[0][0]).days+7)
+	dados2[1].append(ntot2*1e-3)
+
+dates = [x[0].strftime("%d/%m/%Y") for x in dados_aux2]
+
+## parametros que usarei para plotar as curvas
+x_new = np.linspace(0.0, 400, 100)
+
+
+# fitando uma reta
+z = np.polyfit(dados[0], dados[1], 1)
+f1 = np.poly1d(z)
+
+y_linear_fit = f1(x_new)
+
+# fitando uma quadratica
+z = np.polyfit(dados[0], dados[1], 2)
+f2 = np.poly1d(z)
+
+y_quadratica_fit = f2(x_new)
+
+
+## fitando uma cubica
+def fit_func(x, a, b, c):
+    return a*(x**3)+b*(x**2) + c*x #c+b*np.exp(a*x)
+
+params = curve_fit(fit_func, dados[0], dados[1], p0=[0.00001,0.5,-0.5])
+
+# parâmetros
+[a, b, c] = params[0]
+
+# erros nos parâmetros
+perr = np.sqrt(np.diag(params[1]))
+y_exponencial_fit = fit_func(x_new,a,b, c)
+
+
+y_cubica_fit =  fit_func(x_new,a,b,c)
+
+
+# Apenas uma funcao para ajudar a implementar o fsolve que resolve f(x)=0
+def solve_func(x):
+	return fit_func(x,a,b,c)-100
+
+## acha a solucao para quando Nouviews = 100k
+solution = fsolve(solve_func,300)
+
+
+# curva erro-
+def solve_func(x):
+	return fit_func(x,a+perr[0],b+perr[1],c+perr[2])-100
+
+solution_min = fsolve(solve_func,300)
+
+# curva erro+
+def solve_func(x):
+	return fit_func(x,a-perr[0],b-perr[1],c-perr[2])-100
+
+solution_max = fsolve(solve_func,300)
+
+
+
+## poe na tela!!
+print('Tempo total para chegar em 100k (em dias):')
+print('{} +{} ou -{}'.format(int(solution),int(solution_max-solution),int(solution-solution_min)))
+print('Previsao de Chegar em 100k:')
+print('De {}  a {} onde melhor previsao: {}'.format(
+(dados_aux[0][0]+datetime.timedelta(days=-7)+datetime.timedelta(days=int(solution_min))),
+(dados_aux[0][0]+datetime.timedelta(days=-7)+datetime.timedelta(days=int(solution_max))),
+(dados_aux[0][0]+datetime.timedelta(days=-7)+datetime.timedelta(days=int(solution)))
+))
+
+
+####################################
+#
+#   Figura dos Fits
+#
+####################################
+
+
+# eu gosto de criar o plot eixos...
+fig=plt.figure(figsize=(10,10));
+ax=[]
+
+ax.append(plt.subplot(1,1,1))
+
+
+# plot dos dados
+ax[0].scatter(dados2[0],dados2[1],c='red', label='Dados até 09/01/2020')
+
+# plot dos dados
+ax[0].scatter(dados[0],dados[1],c='black', label='Dados até 31/10/2019')
+
+
+#plot do fit cubico
+ax[0].plot(x_new,y_cubica_fit,color='blue', label='Ajuste por Cúbica')
+
+### coisas para deixar o gráfico bonito
+
+ax[0].grid(linestyle='--', linewidth=0.3)
+ax[0].set_title("Evolucao dos Ouviews do Fisicast", fontsize=22)
+ax[0].legend(fontsize=18)
+ax[0].set_xlabel(r'Dias que o Podcast ficou no ar', fontsize=22)
+ax[0].set_ylabel(r'Numero de Ouviews (em milhares)', fontsize=22);
+ax[0].set_xlim([0,400]);
+ax[0].set_ylim([0.0,110]);
+ax[0].tick_params(labelsize=22)
+plt.tight_layout();
+plt.savefig("./post_fisicast_checagem.png");
+plt.close(fig)
+
+
+
+####################################
+#
+#   Figura Erro nos Fits
+#
+####################################
+
+
+
+# eu gosto de criar o plot eixos...
+fig=plt.figure(figsize=(10,10));
+ax=[]
+
+ax.append(plt.subplot(1,1,1))
+
+
+
+
+## valor central
+y_cubica_fit0 =  fit_func(x_new,a,b,c)
+
+
+#valor maximo
+y_cubica_fit1 =  fit_func(x_new,a-perr[0],b-perr[1],c-perr[2])
+
+
+# valor mínimo
+y_cubica_fit2 =  fit_func(x_new,a+perr[0],b+perr[1],c+perr[2])
+
+
+x = np.arange(0.0, 2, 0.01)
+y1 = np.sin(2 * np.pi * x)
+y2 = 1.2 * np.sin(4 * np.pi * x)
+
+## erros
+ax[0].fill_between(x_new, y_cubica_fit1, y_cubica_fit2, color='cyan', alpha=0.5, label='68% C.L.')
+
+
+
+# plot dos dados
+ax[0].scatter(dados2[0],dados2[1],c='red', label='De 31/10/2019 até 09/01/2020')
+
+
+# plot dos dados
+ax[0].scatter(dados[0],dados[1],c='black', label='Dados até 31/10/2019')
+
+
+
+#plot do fit cubico
+ax[0].plot(x_new,y_cubica_fit0,color='blue', label='Ajuste por Cúbica')
+
+ax[0].plot([solution_max,solution_max],[0,100],color='red')
+ax[0].plot([solution_min,solution_min],[0,100],color='red')
+ax[0].text(0.96*solution_max,50,'{} dias'.format(int(solution_max[0])), rotation=90,color='red', alpha=1, fontsize=18)
+ax[0].text(0.96*solution_min,50,'{} dias'.format(int(solution_min[0])), rotation=90,color='red', alpha=1, fontsize=18)
+
+### coisas para deixar o gráfico bonito
+
+ax[0].grid(linestyle='--', linewidth=0.3)
+ax[0].set_title("Evolucao dos Ouviews do Fisicast", fontsize=22)
+ax[0].legend(fontsize=18)
+ax[0].set_xlabel(r'Dias que o Podcast ficou no ar', fontsize=22)
+ax[0].set_ylabel(r'Numero de Ouviews (em milhares)', fontsize=22);
+
+
+aux = []
+ntot = int(len(dados2[0])/2)
+for i in range(ntot):
+	aux.append(dados2[0][2*i])
+aux.append(dados2[0][len(dados2[0])-1])
+ax[0].set_xticks(aux)
+ax[0].set_xlim([0,400]);
+ax[0].set_ylim([0.0,110]);
+ax[0].tick_params(labelsize=22)
+
+aux = []
+ntot = int(len(dates)/2)
+for i in range(ntot):
+	aux.append(dates[2*i])
+aux.append(dates[len(dates)-1])
+
+ax[0].set_xticklabels(aux, fontsize=8.5,rotation=40, ha='right')
+plt.tight_layout();
+plt.savefig("./post_fisicast_erros_checagem.png");
+plt.close(fig)
+
+
+
